@@ -25,7 +25,7 @@ public class FastRestrictedHMM {
     double[][] beta ; // numSentences * numStates backward probabilities
     double[]norm_factor; // numSentences 
     
-    public FastRestrictedHMM(double epsilon,double[][]local,double[] theta,double[]pi){
+    public FastRestrictedHMM(double epsilon,double[][]local,double[] theta,double[]pi,double[][] sprobs){
         this.pi = pi;
         this.theta = theta;
         this.epsilon = epsilon;
@@ -39,7 +39,7 @@ public class FastRestrictedHMM {
         alpha = new double[numSentences][numStates];
         beta = new double[numSentences][numStates];
         norm_factor = new double[numSentences];
-        sprobs = new double[numSentences][numStates];
+        this.sprobs = sprobs;
     }
     public void ForwardBackward(){
         

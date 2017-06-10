@@ -61,14 +61,30 @@ public class FastRestrictedHMMTest {
         
         CombineAllProbs();
         
+        for(int ti = 0;ti<numTopics;ti++){
+                 theta[ti] = 0.0;
+             }
+
+             for(int sIndex = 0;sIndex<=endSentIndex;sIndex++){
+                 for(int ti = 0;ti< numTopics;ti++){
+                     if(Double.isNaN(sprobs[sIndex][ti])){
+                         System.out.println("Nan found for sprobs");
+                     }
+                     theta[ti]+=sprobs[sIndex][ti];
+                 }
+             }
+
+        
         ComputeAlphas(endSentIndex+1,numSentences-1);
         
         double perplexity = 0.0;
-        for(int ti = 0;ti<numStates;ti++){
-            perplexity += alpha[endSentIndex][ti];
+        for(int si = endSentIndex+1;si<numSentences;si++){
+            perplexity  +=Math.log(norm_factor[si]);
         }
         
-        perplexity = Math.exp(-Math.log(perplexity)/testDocSize);
+        
+        
+        perplexity = Math.exp(-perplexity/testDocSize);
         
         return perplexity;
     }
@@ -130,7 +146,7 @@ public class FastRestrictedHMMTest {
   void ComputeAlphas(int begSIndex, int endSIndex){
         double normalizer = 0.0;
         
-        for (int sIndex = begSIndex; sIndex < endSIndex; sIndex++) {
+        for (int sIndex = begSIndex; sIndex <= endSIndex; sIndex++) {
             normalizer = 0.0;
             
             for (int si = 0; si < numTopics; si++) {

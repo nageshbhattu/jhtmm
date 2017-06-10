@@ -62,6 +62,7 @@ public class EM {
         }
         // Here we take into account the priors of the parameters when computing
         // the likelihood:
+        System.out.println("Log Likelihood "+logLikelihood);
         IncorporatePriorsIntoLikelihood();
     };
       // Computes expectations and contribution to the likelihood for a single
@@ -76,10 +77,14 @@ public class EM {
             init_probs[ti] = theta[d][ti];
             init_probs[ti+numTopics] = 0;  // Document must begin with a topic transition.
         }
-        FastRestrictedHMM f = new FastRestrictedHMM(epsilon,locals,theta[d],init_probs);
+        FastRestrictedHMM f = new FastRestrictedHMM(epsilon,locals,theta[d],init_probs,p_dwzpsi[d]);
         
         f.ForwardBackward();
         f.ComputeLogLikelihood();
+        /*if(d%10000==0){
+            System.out.println(d + "Local LL"+local_ll);
+            System.out.println("f LogLikelihood "+f.getLogLikelihood());
+        }*/
         return local_ll + f.getLogLikelihood();
     };
 
@@ -100,24 +105,36 @@ public class EM {
             Normalize(numTopics, locals[sIndex]);
             ll += Math.log(numTopics);
             FeatureSequence sent = doc.sentences.get(sIndex);
-            double min=0;
+            double min = 0.0;
+            double max = Math.log(Double.MIN_VALUE);
             double norm = 0;
             for (int wi = 0; wi < sent.size(); wi++) {
+              
               int word = sent.getIndexAtPosition(wi);
               for (int ti = 0; ti < numTopics; ti++) {
                 locals[sIndex][ti] += Math.log(phi[ti][word]);
-                if(locals[sIndex][ti]<min){
-                    min = locals[sIndex][ti];
+                if(wi==sent.size()-1){
+                    if(locals[sIndex][ti]<min) 
+                        min = locals[sIndex][ti];
+                    if(locals[sIndex][ti]>max)
+                        max = locals[sIndex][ti];
                 }
               }
             }
+            
             for(int ti = 0;ti<numTopics;ti++){
-                locals[sIndex][ti] -= min;
+                locals[sIndex][ti]-= (max+min)/2;
+                if(Double.isInfinite(Math.exp(locals[sIndex][ti])))
+                    System.out.println("Something wrong here");
                 locals[sIndex][ti] = Math.exp(locals[sIndex][ti]);
+                
                 norm += locals[sIndex][ti];
             }    
+            if(Double.isInfinite(norm)){
+                System.out.println("Error with infinity");
+            }
             Normalize(norm, locals[sIndex]);  // to prevent underflow
-            ll += Math.log(norm);
+            ll += Math.log(norm)+Math.exp(max);
         }
         return ll;
     }

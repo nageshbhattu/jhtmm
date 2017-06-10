@@ -38,7 +38,7 @@ public class JhtmmEvaluator {
 	protected int wordStopIndex = 4;
         protected double[][] theta;
         protected double epsilon;
-        protected int lastSentIndex;
+        
         protected int lastWordIndex;
         protected double[][] sprobs;    
         int numStates;
@@ -75,19 +75,28 @@ public class JhtmmEvaluator {
         public void evaluateTM(InstanceList ilist){
             Dirichlet dDirichlet = new Dirichlet(numTopics);
             theta = new double[ilist.size()][numTopics];
+            double avgPerplexity = 0.0;
             int dIndex = 0;
             for(Instance inst:ilist){
                 theta[dIndex] = dDirichlet.nextDistribution();
                 //calculate theta_new using EM algorithm
-                for (int iter = 0; iter < numIterations; iter++) {
-                    EStepSingleDoc(inst,dIndex);
-                    
-                    
-                //
+                double docPerplexity = 0.0;
                 
+                Document document = (Document) inst.getData();
+                splitTestSentence(document);
+                
+                if(testDocSize<=0){
+                    System.out.println("Test Doc " + dIndex + "doesn't have sufficient length for testing");
+                }else{
+                    for (int iter = 0; iter < numIterations; iter++) {
+                        docPerplexity += EStepSingleDoc(inst,dIndex);
+                    }
+                    System.out.println("Averaged Doc Perplexity for doc "+ dIndex + " is " + docPerplexity/numIterations);
+                    avgPerplexity += docPerplexity/numIterations;
                 }
                 dIndex++;
             }
+            
         }
       // Computes expectations and contribution to the likelihood for a single
     // document.
@@ -117,13 +126,13 @@ public class JhtmmEvaluator {
             for(int sIndex = 0;sIndex<document.sentences.size();sIndex++){
                 docSize += document.sentences.get(sIndex).getLength();
             }
-            testDocSize = docSize-wordStopIndex;
+            testDocSize = (docSize<=wordStopIndex) ? 0: docSize-wordStopIndex;
         }
         
-        void EStepSingleDoc(Instance instance,int dIndex){
+        double EStepSingleDoc(Instance instance,int dIndex){
+            double perplexity =0.0;
             Document document = (Document) instance.getData();
-            splitTestSentence(document);
-            
+            if(testDocSize>0){
             int numSentences = document.sentences.size();
             
             locals = new double[numSentences][numTopics];
@@ -137,22 +146,17 @@ public class JhtmmEvaluator {
                 init_probs[ti+numTopics] = 0;  // Document must begin with a topic transition.
             }
             
-            FastRestrictedHMMTest f = new FastRestrictedHMMTest(epsilon,locals,theta[dIndex],init_probs,lastSentIndex,testDocSize);
+            FastRestrictedHMMTest f = new FastRestrictedHMMTest(epsilon,locals,theta[dIndex],init_probs,testSentIndex,testDocSize);
 
              // Perform M Step of EM algorithm for the computation of theta_d
              double[][] sprobs = f.sprobs;
-             for(int ti = 0;ti<numTopics;ti++){
-                 theta[dIndex][ti] = 0.0;
-             }
-
-             for(int sIndex = 0;sIndex<=lastSentIndex;sIndex++){
-                 for(int ti = 0;ti< numTopics;ti++){
-                     theta[dIndex][ti]+=sprobs[sIndex][ti];
-                 }
-             }
-             // Use the theta_d computed in the previous step for the remaining part of the document to compute the perplexity
-             
-
+                          // Use the theta_d computed in the previous step for the remaining part of the document to compute the perplexity
+             perplexity = f.computePerplexity();
+            // System.out.println("Perplexity is " + perplexity);
+            }else{
+              //  System.out.println("Document " + dIndex + " is not having sufficient length");
+            }
+            return perplexity;
         };
     void ComputeLocalProbsForDoc(Document doc, double[][] locals){
         for (int sIndex = 0; sIndex < doc.sentences.size(); sIndex++) {
@@ -183,7 +187,10 @@ public class JhtmmEvaluator {
                 locals[sIndex][ti] -= min;
                 locals[sIndex][ti] = Math.exp(locals[sIndex][ti]);
                 norm += locals[sIndex][ti];
-            }    
+            }
+            if(Double.isNaN(norm)){
+                System.out.println("Nan found in normalization");
+            }
             Normalize(norm, locals[sIndex]);  // to prevent underflow
         }
     }
@@ -194,7 +201,7 @@ public class JhtmmEvaluator {
             vec[vi] = vec[vi]/factor;
         }
     };
-     public static void main(String[] args){
+    public static void main(String[] args){
          
         InstanceList ilist = InstanceList.load(new File(args[0]));
         double [] proportions = {0.75,0.25};
@@ -219,6 +226,7 @@ public class JhtmmEvaluator {
         //void init(int topics, double alpha, double beta, int iters,  
         // int seed,InstanceList ilist)
         jhtmmevaluator.evaluateTM(ilists[1]);
+        
     }
 
     
